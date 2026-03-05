@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>DailyOS</title>
+
+<link rel="manifest" href="manifest.json">
+
+<style>
+
+body{
+font-family:Arial, sans-serif;
+background:#0f172a;
+color:white;
+margin:0;
+padding:20px;
+text-align:center;
+}
+
+header{
+margin-bottom:20px;
+}
+
+#logo{
+font-size:28px;
+font-weight:bold;
+letter-spacing:2px;
+}
+
+#clock{
+font-size:20px;
+opacity:0.8;
+margin-top:5px;
+}
+
+#creator{
+font-size:12px;
+opacity:0.5;
+margin-top:4px;
+}
+
+.inputBox{
+margin:20px 0;
+}
+
+input{
+padding:10px;
+border-radius:8px;
+border:none;
+margin:5px;
+}
+
+button{
+padding:10px 14px;
+border:none;
+border-radius:8px;
+background:#22c55e;
+color:white;
+cursor:pointer;
+}
+
+.task{
+display:flex;
+justify-content:space-between;
+align-items:center;
+background:#1e293b;
+margin:10px auto;
+padding:12px;
+border-radius:10px;
+max-width:400px;
+}
+
+.progress{
+margin-top:20px;
+font-size:16px;
+opacity:0.9;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<div id="logo">DailyOS</div>
+<div id="clock"></div>
+<div id="creator">Personal Life System</div>
+
+</header>
+
+<div class="inputBox">
+
+<input id="taskInput" placeholder="New Task">
+<input id="timeInput" type="time">
+
+<button onclick="addTask()">Add</button>
+
+</div>
+
+<div id="taskList"></div>
+
+<div class="progress" id="progress"></div>
+
+<script>
+
+let tasks = JSON.parse(localStorage.getItem("tasks")) || []
+let lastDate = localStorage.getItem("lastDate")
+
+function save(){
+
+localStorage.setItem("tasks",JSON.stringify(tasks))
+
+}
+
+function render(){
+
+let list=document.getElementById("taskList")
+list.innerHTML=""
+
+let done=0
+
+tasks.forEach((t,i)=>{
+
+if(t.done) done++
+
+let div=document.createElement("div")
+div.className="task"
+
+div.innerHTML=`
+<label>
+<input type="checkbox" ${t.done?"checked":""} onchange="toggle(${i})">
+${t.name} (${t.time||"-"})
+</label>
+
+<button onclick="removeTask(${i})">❌</button>
+`
+
+list.appendChild(div)
+
+})
+
+let percent=tasks.length?Math.floor(done/tasks.length*100):0
+
+document.getElementById("progress").innerText="Progress "+percent+"%"
+
+}
+
+function addTask(){
+
+let name=document.getElementById("taskInput").value
+let time=document.getElementById("timeInput").value
+
+if(!name) return
+
+tasks.push({
+name:name,
+time:time,
+done:false,
+notified:false
+})
+
+save()
+render()
+
+document.getElementById("taskInput").value=""
+
+}
+
+function toggle(i){
+
+tasks[i].done=!tasks[i].done
+
+save()
+render()
+
+}
+
+function removeTask(i){
+
+tasks.splice(i,1)
+
+save()
+render()
+
+}
+
+function updateClock(){
+
+let now=new Date()
+
+document.getElementById("clock").innerText=
+now.toLocaleTimeString()
+
+checkReset(now)
+checkAlarm(now)
+
+}
+
+function checkReset(now){
+
+let today=now.toDateString()
+
+if(lastDate!==today){
+
+tasks.forEach(t=>{
+t.done=false
+t.notified=false
+})
+
+lastDate=today
+localStorage.setItem("lastDate",today)
+
+save()
+render()
+
+}
+
+}
+
+function checkAlarm(now){
+
+let h=String(now.getHours()).padStart(2,'0')
+let m=String(now.getMinutes()).padStart(2,'0')
+
+let current=`${h}:${m}`
+
+tasks.forEach(t=>{
+
+if(t.time===current && !t.notified){
+
+notify(t.name)
+
+t.notified=true
+save()
+
+}
+
+})
+
+}
+
+function notify(text){
+
+if(Notification.permission==="granted"){
+
+new Notification("DailyOS Reminder",{
+body:text
+})
+
+}
+
+}
+
+function askPermission(){
+
+if(Notification.permission!=="granted"){
+
+Notification.requestPermission()
+
+}
+
+}
+
+setInterval(updateClock,1000)
+
+askPermission()
+render()
+
+if("serviceWorker" in navigator){
+
+navigator.serviceWorker.register("sw.js")
+
+}
+
+</script>
+
+</body>
+</html>
